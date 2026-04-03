@@ -1,5 +1,5 @@
 # 🎵 Music Recommender Simulation
-
+![demo](image.png)
 ## Project Summary
 
 In this project you will build and explain a small music recommender system.
@@ -17,17 +17,95 @@ Replace this paragraph with your own summary of what your version does.
 
 ## How The System Works
 
-Explain your design in plain language.
+### Song Features
 
-Some prompts to answer:
+Each song is represented by five features selected for their discriminating power and independence from one another:
 
-- What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-- What information does your `UserProfile` store
-- How does your `Recommender` compute a score for each song
-- How do you choose which songs to recommend
+- `mood` — categorical label (e.g. chill, intense, happy, focused, energetic)
+- `genre` — categorical style label (e.g. hip-hop, lofi, rock, classical)
+- `energy` — intensity level (0.0–1.0)
+- `acousticness` — electronic vs. acoustic texture (0.0–1.0)
+- `danceability` — groove and rhythmic feel (0.0–1.0)
+- `valence` — emotional positivity (0.0–1.0)
 
-You can include a simple diagram or bullet list if helpful.
+`tempo_bpm` is excluded because it is highly correlated with `energy` and adds noise without new signal.
+
+### User Profile
+
+The user profile is a dictionary of target values — one per feature — representing the listener's ideal song. Example:
+
+```python
+user_prefs = {
+    "mood":         "energetic",
+    "genre":        "hip-hop",
+    "energy":       0.85,
+    "acousticness": 0.10,
+    "danceability": 0.88,
+    "valence":      0.70,
+}
+```
+
+### Algorithm Recipe
+
+#### Step 1 — Score every song
+
+**Categorical features** award fixed points on a match:
+
+| Feature | Match | No match |
+|---|---|---|
+| Mood | +2.0 pts | +0.0 pts |
+| Genre | +1.5 pts | +0.0 pts |
+
+Mood outweighs genre because users most often choose music based on how they want to feel, not strictly by style. A chill lofi track and a chill jazz track both serve a study session equally well.
+
+**Numeric features** use a proximity formula that rewards closeness to the user's target — not simply higher or lower values:
+
+```
+points = max_points × (1 − |song_value − user_target|)
+```
+
+| Feature | Max points | Rationale |
+|---|---|---|
+| Energy | 2.0 | Strongest discriminator across the catalog |
+| Acousticness | 1.5 | Independent texture axis (electronic vs. acoustic) |
+| Danceability | 1.0 | Groove preference |
+| Valence | 0.5 | Fine-tuning; partially captured by mood |
+
+**Maximum possible score: 8.5 points**
+
+#### Step 2 — Rank by score
+
+All 20 songs are scored independently, then sorted descending by total score. The top K results are returned as recommendations.
+
+The scoring rule and ranking rule are kept separate so ranking can later add constraints — genre diversity, novelty, tie-breaking — without changing the core similarity math.
+
+#### Data Flow
+
+```
+Input (User Profile)
+        ↓
+Load songs.csv (20 songs)
+        ↓
+For each song:
+  → mood match?        +2.0 or +0.0
+  → genre match?       +1.5 or +0.0
+  → energy proximity   up to +2.0
+  → acousticness prox  up to +1.5
+  → danceability prox  up to +1.0
+  → valence proximity  up to +0.5
+  → total score (max 8.5)
+        ↓
+Sort all scores descending
+        ↓
+Output: Top K recommendations
+```
+
+### Expected Biases
+
+- **Mood/genre lock-in** — a song that matches the user's mood and genre starts with 3.5 of 8.5 points before any numeric features are compared. A song in a different genre with otherwise perfect numeric similarity is structurally disadvantaged.
+- **Small catalog amplifies sparse coverage** — with only 20 songs, some moods and genres appear only once. A user whose preferred mood is "dreamy" will always get the same top match regardless of numeric features.
+- **Numeric features assume linear preference** — the proximity formula treats `energy = 0.50` as equally close to both `0.40` and `0.60`, but real listeners may have asymmetric tolerances (e.g., they accept slightly higher energy but not lower).
+- **Valence is underweighted** — at max 0.5 points, emotional positivity has little influence. A moody, low-valence song could still score very high if energy and danceability align.
 
 ---
 
