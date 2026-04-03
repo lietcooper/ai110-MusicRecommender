@@ -1,5 +1,7 @@
 # 🎵 Music Recommender Simulation
 ![demo](image.png)
+
+![alt text](image-1.png)
 ## Project Summary
 
 In this project you will build and explain a small music recommender system.
